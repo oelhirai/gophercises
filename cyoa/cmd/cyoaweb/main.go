@@ -16,7 +16,7 @@ func main() {
 	fmt.Printf("Using the story in %s.\n", *filename)
 
 	storyMap := parseJson(*filename)
-	handler := cyoa.NewHandler(storyMap)
+	handler := cyoa.NewHandler(storyMap, cyoa.WithTemplate(nil))
 
 	fmt.Printf("Starting the server on %d\n", *port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), handler))
