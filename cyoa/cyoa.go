@@ -4,8 +4,8 @@ import (
 	"io"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"html/template"
+	"log"
 )
 
 func init(){
@@ -48,11 +48,20 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimLeft(r.URL.Path, "/")
+	path := r.URL.Path
+	if path == "" || path == "/" {
+		path = "/intro"
+	}
+	path = path[1:]
+
 	if story, ok := h.s[path]; ok {
-		tpl.Execute(w, story)
+		err := tpl.Execute(w, story)
+		if err != nil {
+			log.Printf("%v", err)
+			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
+		}
 	} else {
-		tpl.Execute(w, h.s["intro"])
+		http.Error(w, "Arc not found...", http.StatusNotFound)
 	}
 }
 
