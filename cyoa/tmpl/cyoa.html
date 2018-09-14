@@ -1,7 +1,22 @@
-{{.Title}}
-{{.Story}}
-{{range .Options}}
-	Option: {{.NextArc}}
-	Text: {{.Text}}
-{{end}}
-	
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf8">
+		<title>Create Your Own Adventure</title>
+	</head>
+	<body>
+		<h1>{{.Title}}</h1>
+		{{range .Paragraphs}}
+			<p>{{.}}</p>
+		{{end}}
+		{{ if .Options}}
+			<ul>
+			{{range .Options}}
+				<li><a href="{{.NextArc}}">{{.Text}}</a></li>
+			{{end}}
+			</ul>
+		{{ else }}
+			<a href="intro">Restart Game</a>
+		{{end}}
+	</body>
+</html>
