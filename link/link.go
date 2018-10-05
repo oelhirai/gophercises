@@ -25,19 +25,28 @@ func ParseLinks(r io.Reader) ([]Link, error) {
 	}
 
 	// Get all nodes with links
-	links := extractLinksFromNode(doc)
+	linkNodes := linkNodes(doc)
+	links := convertNodesToLinks(linkNodes)
 	return links, nil
 }
 
-func extractLinksFromNode(n *html.Node) []Link {
-	var links []Link
+func linkNodes(n *html.Node) []*html.Node {
+	var nodes []*html.Node
 	if n.Type == html.ElementNode && n.Data == "a" {
-		attr := n.Attr[0]
-		links = append(links, Link{Href: attr.Val, Text: n.FirstChild.Data})
+		nodes = append(nodes, n)
 	} else {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			links = append(links, extractLinksFromNode(c)...)
+			nodes = append(nodes, linkNodes(c)...)
 		}
+	}
+	return nodes
+}
+
+func convertNodesToLinks(nodes []*html.Node) []Link {
+	links := make([]Link, len(nodes))
+	for _, n := range nodes {
+		attr := n.Attr[0]
+		links = append(links, Link{Href: attr.Val, Text: n.FirstChild.Data})
 	}
 	return links
 }
