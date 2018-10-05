@@ -3,6 +3,7 @@ package link
 import (
 	"io"
 	"log"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -43,10 +44,35 @@ func linkNodes(n *html.Node) []*html.Node {
 }
 
 func convertNodesToLinks(nodes []*html.Node) []Link {
-	links := make([]Link, len(nodes))
+	var links []Link
 	for _, n := range nodes {
-		attr := n.Attr[0]
-		links = append(links, Link{Href: attr.Val, Text: n.FirstChild.Data})
+		links = append(links, buildLink(n))
 	}
 	return links
+}
+
+func buildLink(n *html.Node) Link {
+	var ret Link
+	for _, attr := range n.Attr {
+		if attr.Key == "href" {
+			ret.Href = attr.Val
+			break
+		}
+	}
+	ret.Text = text(n)
+	return ret
+}
+
+func text(n *html.Node) string {
+	if n.Type == html.TextNode {
+		return n.Data
+	}
+	if n.Type != html.ElementNode {
+		return ""
+	}
+	var ret string
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		ret += text(c) + " "
+	}
+	return strings.Join(strings.Fields(ret), " ")
 }

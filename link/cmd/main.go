@@ -25,7 +25,7 @@ func main() {
 	}
 
 	for _, parsedLink := range links {
-		fmt.Printf("%+v\n", parsedLink)
+		fmt.Println(parsedLink)
 	}
 }
 
