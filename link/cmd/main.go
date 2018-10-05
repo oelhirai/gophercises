@@ -3,15 +3,26 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/oelhirai/gophercises/link"
 )
 
 func main() {
 	filename := readFileName()
+	// Open the html file
+	r, err := os.Open(filename)
+	if err != nil {
+		log.Printf("%v\n", err)
+		panic(err)
+	}
 
-	var links []link.Link
-	links = link.ParseLinks(filename)
+	links, err := link.ParseLinks(r)
+	if err != nil {
+		log.Printf("%v\n", err)
+		panic(err)
+	}
 
 	for _, parsedLink := range links {
 		fmt.Printf("%+v\n", parsedLink)

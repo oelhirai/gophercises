@@ -1,36 +1,33 @@
 package link
 
 import (
+	"io"
 	"log"
-	"os"
 
 	"golang.org/x/net/html"
 )
 
+// Link represents a link (<a href="...">) in an HTML
+// document.
 type Link struct {
 	Href string
 	Text string
 }
 
-func ParseLinks(file string) []Link {
-	// Open the html file
-	r, err := os.Open(file)
-	if err != nil {
-		log.Printf("%v\n", err)
-		os.Exit(1)
-	}
-
+// Parse will tak in an HTML and will return a
+// slice of links parsed from it.
+func ParseLinks(r io.Reader) ([]Link, error) {
 	// Parse the html file
 	doc, err := html.Parse(r)
 	if err != nil {
 		log.Printf("%v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	// Get all nodes with links
 	var links []Link
 	extractLinksFromNode(doc, &links)
-	return links
+	return links, nil
 }
 
 func extractLinksFromNode(n *html.Node, links *[]Link) {
