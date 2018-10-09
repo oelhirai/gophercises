@@ -15,7 +15,7 @@ type Link struct {
 	Text string
 }
 
-// Parse will tak in an HTML and will return a
+// ParseLinks will tak in an HTML and will return a
 // slice of links parsed from it.
 func ParseLinks(r io.Reader) ([]Link, error) {
 	// Parse the html file
