@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/oelhirai/gophercises/link"
-	// "github.com/oelhirai/gophercises/link"
 )
 
 // PageURL is a struct simply holding a url
@@ -44,30 +44,28 @@ func (s *set) Contains(value string) bool {
 
 // BuildSiteMap extracts all links from the given host.
 // the depth is the maximum number of links to follow when building the sitemap
-func BuildSiteMap(site string, depth int) {
+func BuildSiteMap(hostURL string, depth int) {
 	var seenLinks *set
-	var nextQueue []link.Link
-	var currentQueue []link.Link
+	var nextQueue []string
+	var currentQueue []string
 
+	// Build link retriever which resolves
 	seenLinks = newSet()
-	seenLinks.Add(site)
-	currentQueue, err := getLinks(site)
-	if err != nil {
-		fmt.Printf("Error retrieving site: %s", err)
-		os.Exit(1)
-	}
+	seenLinks.Add(hostURL)
+	getHrefs := getLinksRetrieverClosure(hostURL)
+	currentQueue, _ = getHrefs(hostURL)
 
 	// Start exploring url in page...
 	for depth > 0 {
 		for _, l := range currentQueue {
-			if canCheckURL(l.Href, seenLinks) {
-				seenLinks.Add(l.Href)
-				linksInPage, _ := getLinks(l.Href)
+			if !seenLinks.Contains(l) {
+				seenLinks.Add(l)
+				linksInPage, _ := getHrefs(l)
 				nextQueue = append(nextQueue, linksInPage...)
 			}
 		}
 		currentQueue = nextQueue
-		nextQueue = make([]link.Link, 0)
+		nextQueue = make([]string, 0)
 		depth--
 	}
 
@@ -84,55 +82,36 @@ func BuildSiteMap(site string, depth int) {
 	os.Stdout.Write(output)
 }
 
-func getLinks(url string) ([]link.Link, error) {
-	resp, err := http.Get(url)
+func getLinksRetrieverClosure(hostSite string) func(string) ([]string, error) {
+	return func(site string) ([]string, error) {
+		return hrefs(site, hostSite)
+	}
+}
+
+func hrefs(site string, hostSite string) ([]string, error) {
+	resp, err := http.Get(site)
 	if err != nil {
 		fmt.Printf("Error retrieving site: %s", err)
 		return nil, err
 	}
+	defer resp.Body.Close()
 
-	links, err := link.ParseLinks(resp.Body)
-	if err != nil {
-		fmt.Printf("Error retrieving site: %s", err)
-		return nil, err
+	reqURL := resp.Request.URL
+	baseURL := &url.URL{
+		Scheme: reqURL.Scheme,
+		Host:   reqURL.Host,
 	}
+	base := baseURL.String()
 
-	for _, link := range links {
-		fullLink, err := getAbsoluteURL(link.Href, url)
-		if err != nil {
-			fmt.Printf("Error retrieving site: %s", err)
-			return nil, err
+	var result []string
+	links, _ := link.ParseLinks(resp.Body)
+	for _, l := range links {
+		switch {
+		case strings.HasPrefix(l.Href, "/"):
+			result = append(result, base+l.Href)
+		case strings.HasPrefix(l.Href, "http"):
+			result = append(result, l.Href)
 		}
-		link.Href = fullLink.String()
 	}
-
-	return links, nil
-}
-
-func canCheckURL(curSite string, seenLinks *set) bool {
-	if seenLinks.Contains(curSite) {
-		return false
-	}
-	curURL, _ := url.Parse(curSite)
-	if curURL.Scheme != "https" {
-		return false
-	}
-	return true
-}
-
-func getAbsoluteURL(currentSite string, referenceSite string) (*url.URL, error) {
-	currentURL, err := url.Parse(currentSite)
-	if err != nil {
-		return nil, err
-	}
-	if currentURL.IsAbs() {
-		return currentURL, nil
-	}
-
-	// currentUrl is relative, resolve with host of reference site
-	referenceURL, err := url.Parse(referenceSite)
-	if err != nil {
-		return nil, err
-	}
-	return referenceURL.ResolveReference(currentURL), nil
+	return result, nil
 }
