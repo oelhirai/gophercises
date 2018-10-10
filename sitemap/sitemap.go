@@ -3,6 +3,7 @@ package sitemap
 import (
 	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -52,15 +53,14 @@ func BuildSiteMap(hostURL string, depth int) {
 	// Build link retriever which resolves
 	seenLinks = newSet()
 	seenLinks.Add(hostURL)
-	getHrefs := getLinksRetrieverClosure(hostURL)
-	currentQueue, _ = getHrefs(hostURL)
+	currentQueue, _ = get(hostURL)
 
 	// Start exploring url in page...
 	for depth > 0 {
 		for _, l := range currentQueue {
 			if !seenLinks.Contains(l) {
 				seenLinks.Add(l)
-				linksInPage, _ := getHrefs(l)
+				linksInPage, _ := get(l)
 				nextQueue = append(nextQueue, linksInPage...)
 			}
 		}
@@ -82,13 +82,7 @@ func BuildSiteMap(hostURL string, depth int) {
 	os.Stdout.Write(output)
 }
 
-func getLinksRetrieverClosure(hostSite string) func(string) ([]string, error) {
-	return func(site string) ([]string, error) {
-		return hrefs(site, hostSite)
-	}
-}
-
-func hrefs(site string, hostSite string) ([]string, error) {
+func get(site string) ([]string, error) {
 	resp, err := http.Get(site)
 	if err != nil {
 		fmt.Printf("Error retrieving site: %s", err)
@@ -103,8 +97,12 @@ func hrefs(site string, hostSite string) ([]string, error) {
 	}
 	base := baseURL.String()
 
+	return filter(hrefs(resp.Body, base), withPrefix(base)), nil
+}
+
+func hrefs(r io.Reader, base string) []string {
 	var result []string
-	links, _ := link.ParseLinks(resp.Body)
+	links, _ := link.ParseLinks(r)
 	for _, l := range links {
 		switch {
 		case strings.HasPrefix(l.Href, "/"):
@@ -113,5 +111,21 @@ func hrefs(site string, hostSite string) ([]string, error) {
 			result = append(result, l.Href)
 		}
 	}
-	return result, nil
+	return result
+}
+
+func filter(links []string, keepFn func(string) bool) []string {
+	var ret []string
+	for _, l := range links {
+		if keepFn(l) {
+			ret = append(ret, l)
+		}
+	}
+	return ret
+}
+
+func withPrefix(pfx string) func(string) bool {
+	return func(l string) bool {
+		return strings.HasPrefix(l, pfx)
+	}
 }
