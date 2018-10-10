@@ -1,6 +1,7 @@
 package sitemap
 
 import (
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,17 @@ import (
 	"github.com/oelhirai/gophercises/link"
 	// "github.com/oelhirai/gophercises/link"
 )
+
+// PageURL is a struct simply holding a url
+type PageURL struct {
+	URL string `xml:"loc"`
+}
+
+// URLSet is a struct used in converting data to XML
+type URLSet struct {
+	XMLName xml.Name  `xml:"urlset"`
+	Urls    []PageURL `xml:"url"`
+}
 
 type set struct {
 	m map[string]struct{}
@@ -30,14 +42,16 @@ func (s *set) Contains(value string) bool {
 	return c
 }
 
-func BuildSiteMap(url string, depth int) {
+// BuildSiteMap extracts all links from the given host.
+// the depth is the maximum number of links to follow when building the sitemap
+func BuildSiteMap(site string, depth int) {
 	var seenLinks *set
 	var nextQueue []link.Link
 	var currentQueue []link.Link
 
 	seenLinks = newSet()
-	seenLinks.Add(url)
-	currentQueue, err := getLinks(url)
+	seenLinks.Add(site)
+	currentQueue, err := getLinks(site)
 	if err != nil {
 		fmt.Printf("Error retrieving site: %s", err)
 		os.Exit(1)
@@ -57,9 +71,17 @@ func BuildSiteMap(url string, depth int) {
 		depth--
 	}
 
+	sitemap := &URLSet{}
 	for k := range seenLinks.m {
-		fmt.Println(k)
+		sitemap.Urls = append(sitemap.Urls, PageURL{k})
 	}
+
+	output, err := xml.MarshalIndent(sitemap, "  ", "    ")
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
+
+	os.Stdout.Write(output)
 }
 
 func getLinks(url string) ([]link.Link, error) {
@@ -76,7 +98,7 @@ func getLinks(url string) ([]link.Link, error) {
 	}
 
 	for _, link := range links {
-		fullLink, err := getFullyQualifiedURL(link.Href, url)
+		fullLink, err := getAbsoluteURL(link.Href, url)
 		if err != nil {
 			fmt.Printf("Error retrieving site: %s", err)
 			return nil, err
@@ -87,25 +109,27 @@ func getLinks(url string) ([]link.Link, error) {
 	return links, nil
 }
 
-func canCheckURL(curURL string, seenLinks *set) bool {
-	if seenLinks.Contains(curURL) {
+func canCheckURL(curSite string, seenLinks *set) bool {
+	if seenLinks.Contains(curSite) {
 		return false
 	}
-	currentURL, _ := url.Parse(curURL)
-	if currentURL.Scheme != "https" {
+	curURL, _ := url.Parse(curSite)
+	if curURL.Scheme != "https" {
 		return false
 	}
 	return true
 }
 
-func getFullyQualifiedURL(currentSite string, referenceSite string) (*url.URL, error) {
+func getAbsoluteURL(currentSite string, referenceSite string) (*url.URL, error) {
 	currentURL, err := url.Parse(currentSite)
 	if err != nil {
 		return nil, err
 	}
-	if currentURL.Host != "" {
+	if currentURL.IsAbs() {
 		return currentURL, nil
 	}
+
+	// currentUrl is relative, resolve with host of reference site
 	referenceURL, err := url.Parse(referenceSite)
 	if err != nil {
 		return nil, err
