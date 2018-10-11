@@ -39,37 +39,29 @@ func (s *set) Add(value string) {
 }
 
 func (s *set) Contains(value string) bool {
-	_, c := s.m[value]
-	return c
+	_, ok := s.m[value]
+	return ok
 }
 
 // BuildSiteMap extracts all links from the given host.
 // the depth is the maximum number of links to follow when building the sitemap
 func BuildSiteMap(hostURL string, depth int) {
-	var seenLinks *set
-	var nextQueue []string
+	seenLinks := newSet()
+	nextQueue := []string{hostURL}
 	var currentQueue []string
 
-	// Build link retriever which resolves
-	seenLinks = newSet()
-	seenLinks.Add(hostURL)
-	currentQueue, _ = get(hostURL)
-
-	// Start exploring url in page...
-	for depth > 0 {
-		for _, l := range currentQueue {
-			if !seenLinks.Contains(l) {
-				seenLinks.Add(l)
-				linksInPage, _ := get(l)
-				nextQueue = append(nextQueue, linksInPage...)
+	for i := 0; i <= depth; i++ {
+		currentQueue, nextQueue = nextQueue, make([]string, 0)
+		for _, ref := range currentQueue {
+			if !seenLinks.Contains(ref) {
+				seenLinks.Add(ref)
+				nextQueue = append(nextQueue, get(ref)...)
 			}
 		}
 		currentQueue = nextQueue
-		nextQueue = make([]string, 0)
-		depth--
 	}
 
-	sitemap := &URLSet{}
+	sitemap := URLSet{}
 	for k := range seenLinks.m {
 		sitemap.Urls = append(sitemap.Urls, PageURL{k})
 	}
@@ -82,11 +74,10 @@ func BuildSiteMap(hostURL string, depth int) {
 	os.Stdout.Write(output)
 }
 
-func get(site string) ([]string, error) {
+func get(site string) []string {
 	resp, err := http.Get(site)
 	if err != nil {
-		fmt.Printf("Error retrieving site: %s", err)
-		return nil, err
+		panic(err)
 	}
 	defer resp.Body.Close()
 
@@ -97,7 +88,7 @@ func get(site string) ([]string, error) {
 	}
 	base := baseURL.String()
 
-	return filter(hrefs(resp.Body, base), withPrefix(base)), nil
+	return filter(hrefs(resp.Body, base), withPrefix(base))
 }
 
 func hrefs(r io.Reader, base string) []string {
